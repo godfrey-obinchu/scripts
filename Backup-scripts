@@ -1,0 +1,24 @@
+#!/bin/bash
+
+## Simple script to create backup of Wordpress Database
+
+NOW=$(date +"%Y-%m-%d-%H%M")
+BACKUP_DIR="/backups"
+
+DB_USER=""
+DB_PASS=""
+DB_NAME=""
+DB_SQL=""
+DB_FILE="<name>.$NOW.tgz"
+
+FILE="<name>.$NOW.tgz"
+
+mysqldump -u$DB_USER -p$DB_PASS $DB_NAME --single-transaction --flush-logs > $BACKUP_DIR/$DB_SQL
+tar -zcf $BACKUP_DIR/$DB_FILE $BACKUP_DIR/$DB_SQL
+
+cd /dir-path-to-backup/
+tar -zcf $BACKUP_DIR/$FILE </path/>
+rm $BACKUP_DIR/$DB_SQL
+
+# remove files older than 3 days
+find $BACKUP_DIR/* -mtime +3 -exec rm -f {} \;
