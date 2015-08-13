@@ -1,0 +1,55 @@
+#!/bin/bash
+
+server_name="DR Wordpress in AWS"
+admin_email='admin@example.com' #email of the database administrator to recieve notification
+a=0
+
+# change mysql credentials in the following commands if you running monitor using a user other than root
+sql_thread_running=$(mysql -e "show slave status\G" | awk -F":" '/Slave_SQL_Running/ { print $2 }' | tr -d ' ')
+io_thread_running=$(mysql -e "show slave status\G" | awk -F":" '/Slave_IO_Running/ { print $2 }' | tr -d ' ')
+seconds_late=$(mysql -e "show slave status\G" | awk -F":" '/Seconds_Behind_Master/ { print $2 }' | tr -d ' ')
+seconds_late=$(($seconds_late+0))
+
+if [ "$sql_thread_running" = "No" ] || [ "$io_thread_running" = "No" ] || [ $seconds_late -gt 60 ]; then
+
+log_file="/tmp/log_slave_status_$(date +%m-%d-%Y-%H:%M)"
+echo "Slave status report on $(date +%m-%d-%Y-%H:%M)" >> $log_file
+echo "Error in slave on $server_name" >> $log_file
+if [ "$sql_thread_running" = "No" ]; then
+echo "SQL Thread not running" >> $log_file
+fi
+
+if [ "$io_thread_running" = "No" ]; then
+echo "IO thread not running" >> $log_file
+fi
+
+if [ $seconds_late -gt 60 ]; then #formattting how the latency of the slave behind master should be displayed
+display_late="$seconds_late seconds"
+if [ $seconds_late -gt 60 ]; then
+display_late="$display_late = $(($seconds_late/60)) minutes"
+fi
+
+if [ $seconds_late -gt 60 ]; then
+display_late="$display_late = $(($seconds_late/3600)) hours"
+fi
+
+echo "slave is behind master by $display_late" >> $log_file
+fi
+
+#echo send alerts to the admin
+mail -s "Slave status on $server_name" $admin_email < $log_file
+echo "Slave not running, alerts sent to the admins..."
+else
+echo "slave is running normally, no problem detected :)"
+fi
+
+while [ $a -lt 1000 ]
+do
+        check=`echo "SHOW SLAVE STATUS \G" | mysql - -u <username> -p<password> | grep "Last_SQL_Error:" | grep -c "Could not execute"`
+        if [ $check -eq 0 ] ; then
+                break
+        fi
+        echo "CALL mysql.rds_skip_repl_error;" | mysql -h <hostname> -u <username> -p<password>
+        a=$(( $a + 1 ))
+        mail -s "$SUBJECT" $EMAIL
+done
